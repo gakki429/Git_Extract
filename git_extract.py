@@ -9,23 +9,10 @@ import zlib
 import urllib2
 from lib.git_pack import GitPack
 from lib.git_index import GitIndex
+from lib.utils import _mkdir, _print
 
-def _mkdir(path):
-    path = os.path.dirname(path)
-    if path and not os.path.exists(path):
-        os.makedirs(path)
-
-def _print(stdout, color='beige'):
-    color_num = {
-        'red': 31,
-        'green': 32,
-        'beige': 36,
-        'white': 37,
-    }
-    print '\033[1;{};40m{}\033[0m\n'.format(color_num[color], stdout),
-    
 class GitExtract(object):
-    """Git Recover without git command"""
+    """Git Extract without git command"""
     def __init__(self, git_host):
         self.git_host = git_host
         if 'http' in self.git_host:
@@ -72,7 +59,7 @@ class GitExtract(object):
                 open(path, 'wb').write(data)
                 return data
         except Exception as e:
-            _print('[-] Download File Failed {} '.format(path), 'red')
+            # _print('[-] File not exist {} '.format(path), 'red')
             return
 
     def git_object_parse(self, _hash):
