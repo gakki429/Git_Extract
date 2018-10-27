@@ -14,31 +14,35 @@ from lib.utils import _mkdir, _print
 class GitExtract(object):
     """Git Extract without git command"""
     def __init__(self, git_host):
-        self.git_host = git_host
-        if 'http' in self.git_host:
-            self.git_path = re.search(r'https?://(.*)', 
-                                  git_host).group(1).replace(':', '_')
-            self.local = False
-        else:
+        if os.path.exists(git_host):
             self.git_path = git_host
             self.local = True
+        elif (git_host.startswith('http') 
+                and git_host.endswith('/')):
+            self.git_path = re.search(r'https?://(.*)', 
+                                git_host).group(1).replace(':', '_')
+            self.local = False
+            _mkdir(self.git_path)
+        else:
+            _print('Usage:\n\tpython {} http://example.com/.git/'.format((sys.argv[0])), 'red')
+            sys.exit(0)
         self.objects = {}
         self.refs_hash = set()
-        _mkdir(self.git_path)
-        os.chdir(self.git_path)
+        self.git_host = git_host
         self._logo()
-        _print('[*] Start Git Extract')
-        _print('[*] Target Url: {}'.format(self.git_host))
+        _print('[*] Start Extract')
+        _print('[*] Target Git: {}'.format(self.git_host))
+        os.chdir(self.git_path)
 
     def _logo(self):
         Logo = """
-      ____ _ _   _____      _                  _   
-     / ___(_) |_| ____|_  __ |_ _ __ __ _  ___| |_ 
-    | |  _| | __|  _| \ \/ / __| '__/ _` |/ __| __|
-    | |_| | | |_| |___ >  <| |_| | | (_| | (__| |_ 
-     \____|_|\__|_____/_/\_\\\\__|_|  \__,_|\___|\__|
-
-                                        Author: gakki429
+    ________.__  __    ___________         __                        __   
+   /  _____/|__|/  |_  \_   _____/__  ____/  |_____________    _____/  |_ 
+  /   \  ___|  \   __\  |    __)_\  \/  /\   __\_  __ \__  \ _/ ___\   __\\
+  \    \_\  \  ||  |    |        \>    <  |  |  |  | \// __ \\\\  \___|  |  
+   \______  /__||__|   /_______  /__/\_ \ |__|  |__|  (____  /\___  >__|  
+          \/                   \/      \/                  \/     \/      
+                                                    Author: gakki429
         """
         _print(Logo, 'green')
 
@@ -270,4 +274,4 @@ if __name__ == '__main__':
         Git = GitExtract(GIT_HOST)
         Git.git_init()
     else:
-        _print('Usage : \n\tpython {} http://example.com/.git/'.format((sys.argv[0])), 'red')
+        _print('Usage:\n\tpython {} http://example.com/.git/'.format((sys.argv[0])), 'red')
