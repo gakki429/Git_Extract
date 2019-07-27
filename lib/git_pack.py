@@ -75,7 +75,10 @@ class GitPack(object):
     def parse_pack(self):
         for _hash, _info in sorted(self.objects.items(), key=lambda x: x[1]['offset']):
             _size = []
-            flag, zlib_data = re.search('(.*?)(\x78\x9c.*)', _info['data'], re.S).groups()
+            try:
+                flag, zlib_data = re.search('(.*?)(\x78\x9c.*)', _info['data'], re.S).groups()
+            except AttributeError:
+                return
             for i in range(len(flag)):
                 bin_info = bin(int(flag[i].encode('hex'), 16))[2:].rjust(8, '0')
                 msb = bin_info[0]
@@ -93,7 +96,10 @@ class GitPack(object):
 
     def pack_to_object_file(self):
         for _object in self.objects.values():
-            object_format = '{} {}\x00{}'.format(_object['type'], _object['length'], _object['file'])
+            try:
+                object_format = '{} {}\x00{}'.format(_object['type'], _object['length'], _object['file'])
+            except KeyError:
+                continue
             sha = hashlib.sha1(object_format).hexdigest()
             path = 'objects/{}'.format(sha[:2])
             if path and not os.path.exists(path):

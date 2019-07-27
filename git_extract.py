@@ -11,6 +11,8 @@ from lib.git_pack import GitPack
 from lib.git_index import GitIndex
 from lib.utils import _mkdir, _print
 
+urllib2.getproxies = lambda: {}
+
 class GitExtract(object):
     """Git Extract without git command"""
     def __init__(self, git_host):
@@ -69,13 +71,16 @@ class GitExtract(object):
     def git_object_parse(self, _hash):
         path = 'objects/{}/{}'.format(_hash[:2], _hash[2:])
         file = self.download_file(path)
-        data = zlib.decompress(file)
-        _type, _len, _file = re.findall("^(tag|blob|tree|commit) (\d+?)\x00(.*)", data, re.S|re.M)[0]
-        if int(_len) == len(_file):
-            self.objects[_hash] = _type
-            return _type, _len, _file
-        else:
-            self.objects[_hash] = 'unkown'
+        try:
+            data = zlib.decompress(file)
+            _type, _len, _file = re.findall("^(tag|blob|tree|commit) (\d+?)\x00(.*)", data, re.S|re.M)[0]
+            if int(_len) == len(_file):
+                self.objects[_hash] = _type
+                return _type, _len, _file
+            else:
+                self.objects[_hash] = 'unknown'
+        except TypeError:
+            self.objects[_hash] = 'unknown'
 
     def git_file_type(self, mode):
         if mode in ['160000']:
@@ -87,7 +92,10 @@ class GitExtract(object):
 
     def git_ls_tree(self, _hash):
         tree = self.git_object_parse(_hash)
-        tree = set(re.findall("(\d{5,6}) (.*?)\x00(.{20})", tree[2], re.M|re.S))
+        try:
+            tree = set(re.findall("(\d{5,6}) (.*?)\x00(.{20})", tree[2], re.M|re.S))
+        except TypeError:
+            tree = set()
         tree_result = set()
         for _mode, _path, _hash in tree:
             _type = self.git_file_type(_mode)
@@ -97,11 +105,14 @@ class GitExtract(object):
 
     def git_save_blob(self, _dir, _path, _hash, save_file=False):
         filename = _dir + _path
-        data = self.git_object_parse(_hash)[2]
+        try:
+            data = self.git_object_parse(_hash)[2]
+        except TypeError:
+            return
         if os.path.isfile(filename):
             file = open(filename, 'rb').read()
             if file != data:
-                filename = '{}{}_{}'.format(_dir, _hash[:6], _path)
+                filename = '{}{}.{}'.format(_dir, _path, _hash[:6])
                 if not os.path.isfile(filename):
                     # 这里的逻辑有待完善，虽然hash[:6]基本不会重复
                     save_file = True
@@ -123,7 +134,7 @@ class GitExtract(object):
             elif _type == 'commit':
                 self.git_commit(_hash)
             else:
-                _print('[-] unkown {} {}'.format(
+                _print('[-] unknown {} {}'.format(
                     self.git_object_parse(_hash)[0], _hash), 'red')
 
     def git_commit(self, _hash, data=''):
@@ -172,7 +183,10 @@ class GitExtract(object):
         if '0'*40 in data_hash:
             data_hash.remove('0'*40)
         for _hash in data_hash:
-            _type, _len, file = self.git_object_parse(_hash)
+            try:
+                _type, _len, file = self.git_object_parse(_hash)
+            except TypeError:
+                continue
             if _type == 'commit':
                 self.git_commit(_hash)
             elif _type == 'tree':
@@ -249,6 +263,8 @@ class GitExtract(object):
             'FETCH_HEAD',
         ]
         info_path = [
+            'config',
+            'description',
             'info/exclude',
             'COMMIT_EDITMSG',
         ]
