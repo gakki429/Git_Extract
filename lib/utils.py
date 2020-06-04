@@ -2,13 +2,38 @@
 __author__ = 'gakki429'
 
 import os
-import sys
+import ssl
 import struct
+import sys
+import urllib
+import urllib2
 
 try:
     from ctypes import windll, create_string_buffer
 except ImportError:
     pass
+
+class NoRedirectHandler(urllib2.HTTPRedirectHandler):
+    # https://gist.github.com/magnetikonline/9d3aa5d3df53b6a445eda77a16db20bc
+    def http_error_300(self, req, fp, code, msg, header_list):
+        data = urllib.addinfourl(fp, header_list, req.get_full_url())
+        data.status = code
+        data.code = code
+        return data
+
+    http_error_301 = http_error_300
+    http_error_302 = http_error_300
+    http_error_303 = http_error_300
+    http_error_307 = http_error_300
+
+urllib2.install_opener(
+    urllib2.build_opener(NoRedirectHandler())
+)
+urllib2.getproxies = lambda: {}
+ssl._create_default_https_context = ssl._create_unverified_context
+
+def http_resp(url):
+    return urllib2.urlopen(url)
 
 def win_default_color():
     stdout_handle = windll.kernel32.GetStdHandle(-11)

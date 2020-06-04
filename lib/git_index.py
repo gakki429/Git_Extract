@@ -44,7 +44,7 @@ class GitIndex(object):
             _hash = self.reads(20).encode('hex')
             flags = self.str2int(self.reads(2))
             bin_flags = bin(flags)[2:].rjust(16, '0')
-            # Todo: 依据flags区分版本
+            # Todo: 依据 flags 区分版本
             name_len = flags & 0xfff
             filename = self.reads(name_len)
             fill_len = 8 - ((0x3e + name_len) % 8)
@@ -59,7 +59,7 @@ class GitIndex(object):
             self.tree_extension(tree_data)
 
     def tree_extension(self, tree_data):
-        tree_info = re.findall('(.*?)\x00(\d+) (\d+)\x0a(.{20})', tree_data, re.S|re.M)
+        tree_info = re.findall(r'(.*?)\x00(\d+) (\d+)\x0a(.{20})', tree_data, re.S|re.M)
         for _name, _all_count, _dir_count, _hash in tree_info:
             _hash = _hash.encode('hex')
             self.tree_objects[_hash] = {'name': _name}

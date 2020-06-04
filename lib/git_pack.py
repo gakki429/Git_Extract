@@ -32,12 +32,12 @@ class GitPack(object):
         fan_out_table = pack_idx[8:8+1024]
         pack_hash = pack_idx[-40:-20]
         idx_hash = pack_idx[-20:]
-        # Todo: 区分版本（v1，v2），区分idx大小，大于2g的offset为8bytes
+        # Todo: 区分版本（v1，v2），区分idx大小，大于 2g 的 offset 为 8bytes
         idx_data = pack_idx[8+1024:-40]
         self.parse_idx(idx_data)
 
     def split_to_hex(self, length, data):
-        data = re.findall('(.{{{}}})'.format(length), data, re.S|re.M)
+        data = re.findall(r'(.{{{}}})'.format(length), data, re.S|re.M)
         return map(lambda x: x.encode('hex'), data)
 
     def parse_idx(self, idx_data):
@@ -89,7 +89,6 @@ class GitPack(object):
                     _size.append(bin_info[-7:])
             _length = int(''.join(_size[::-1]), 2) # 这里其实是小端，不是大端
             _type = self.pack_type(_type)
-            print _length, _type, _hash
             self.objects[_hash]['type'] = _type
             self.objects[_hash]['length'] = _length
             self.objects[_hash]['file'] = zlib.decompress(zlib_data)
@@ -97,7 +96,8 @@ class GitPack(object):
     def pack_to_object_file(self):
         for _object in self.objects.values():
             try:
-                object_format = '{} {}\x00{}'.format(_object['type'], _object['length'], _object['file'])
+                object_format = '{} {}\x00{}'.format(
+                    _object['type'], _object['length'], _object['file'])
             except KeyError:
                 continue
             sha = hashlib.sha1(object_format).hexdigest()
@@ -112,4 +112,4 @@ class GitPack(object):
         self.idx_header()
         self.extract_pack()
         self.pack_to_object_file()
-        # Todo: 重建ofs_delta，ref_delta
+        # Todo: 重建 ofs_delta，ref_delta

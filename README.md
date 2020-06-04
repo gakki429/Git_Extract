@@ -18,6 +18,8 @@
     - refs/stash 工作进度保存
     - refs/heads/master master 恢复
     - info/packs packs 文件提取恢复
+    - refs/wip/index/refs/heads/master magit wip 模式 (PlaidCTF 2020)
+    - refs/wip/wtree/refs/heads/master
 
 - 可能重复但仍做恢复的项：
 
@@ -59,11 +61,15 @@ $ python git_extract.py example/.git/ 一个本地的 .git 路径
     修复文件缺失、文件格式错误等造成的报错退出  
     修正 urllib2 默认使用系统代理，造成下载缓慢的情况 
 
+- 2020-6-4：
+    
+    禁止跟随跳转，增加新恢复项 magit wip 模式
+
 ### 待做
 
 - 解析其他版本的 git 文件格式，目前支持 version 2
 - pack 文件的 ofs_delta, ref_delta 类型文件的重建
 
 ### 参考
-- [pack文件格式](https://git-scm.com/docs/pack-format) 
-- [index文件格式](https://git-scm.com/docs/index-format) 
+- [pack 文件格式](https://git-scm.com/docs/pack-format) 
+- [index 文件格式](https://git-scm.com/docs/index-format) 

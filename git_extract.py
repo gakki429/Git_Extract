@@ -4,14 +4,10 @@ __author__ = 'gakki429'
 import os
 import re
 import sys
-import ssl
 import zlib
-import urllib2
 from lib.git_pack import GitPack
 from lib.git_index import GitIndex
-from lib.utils import _mkdir, _print
-
-urllib2.getproxies = lambda: {}
+from lib.utils import http_resp, _mkdir, _print
 
 class GitExtract(object):
     """Git Extract without git command"""
@@ -19,10 +15,11 @@ class GitExtract(object):
         if os.path.exists(git_host):
             self.git_path = git_host
             self.local = True
-        elif (git_host.startswith('http') 
+        elif (git_host.startswith('http')
                 and git_host.endswith('/')):
-            self.git_path = re.search(r'https?://(.*)', 
-                                git_host).group(1).replace(':', '_')
+            self.git_path = re.search(
+                r'https?://(.*)', git_host
+            ).group(1).replace(':', '_')
             self.local = False
             _mkdir(self.git_path)
         else:
@@ -39,11 +36,11 @@ class GitExtract(object):
     def _logo(self):
         Logo = """
     ________.__  __    ___________         __                        __   
-   /  _____/|__|/  |_  \_   _____/__  ____/  |_____________    _____/  |_ 
-  /   \  ___|  \   __\  |    __)_\  \/  /\   __\_  __ \__  \ _/ ___\   __\\
-  \    \_\  \  ||  |    |        \>    <  |  |  |  | \// __ \\\\  \___|  |  
-   \______  /__||__|   /_______  /__/\_ \ |__|  |__|  (____  /\___  >__|  
-          \/                   \/      \/                  \/     \/      
+   /  _____/|__|/  |_  \\_   _____/__  ____/  |_____________    _____/  |_ 
+  /   \\  ___|  \\   __\\  |    __)_\\  \\/  /\\   __\\_  __ \\__  \\ _/ ___\\   __\\
+  \\    \\_\\  \\  ||  |    |        \\>    <  |  |  |  | \\// __ \\\\  \\___|  |  
+   \\______  /__||__|   /_______  /__/\\_ \\ |__|  |__|  (____  /\\___  >__|  
+          \\/                   \\/      \\/                  \\/     \\/      
                                                     Author: gakki429
         """
         _print(Logo, 'green')
@@ -55,10 +52,7 @@ class GitExtract(object):
             return
         url = self.git_host + path
         try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            resp = urllib2.urlopen(url, context=ctx)
+            resp = http_resp(url)
             if resp.getcode() == 200:
                 data = resp.read()
                 _mkdir(path)
@@ -66,34 +60,41 @@ class GitExtract(object):
                 return data
         except Exception as e:
             # _print('[-] File not exist {} '.format(path), 'red')
-            return
+            pass
 
     def git_object_parse(self, _hash):
         path = 'objects/{}/{}'.format(_hash[:2], _hash[2:])
         file = self.download_file(path)
+        self.objects[_hash] = 'unknown'
+        if file is None:
+            return
         try:
             data = zlib.decompress(file)
-            _type, _len, _file = re.findall("^(tag|blob|tree|commit) (\d+?)\x00(.*)", data, re.S|re.M)[0]
+            _type, _len, _file = re.findall(
+                r'^(tag|blob|tree|commit) (\d+?)\x00(.*)', data, re.S | re.M)[0]
             if int(_len) == len(_file):
                 self.objects[_hash] = _type
                 return _type, _len, _file
-            else:
-                self.objects[_hash] = 'unknown'
         except TypeError:
-            self.objects[_hash] = 'unknown'
+            pass
+        except zlib.error:
+            pass
+        except Exception as e:
+            # _print('[-] Object parse error', 'red')
+            pass
 
     def git_file_type(self, mode):
         if mode in ['160000']:
             return 'commit'
-        elif mode in ['40000']:
+        if mode in ['40000']:
             return 'tree'
-        elif mode in ['100644', '100664', '100755', '120000']:
+        if mode in ['100644', '100664', '100755', '120000']:
             return 'blob'
 
     def git_ls_tree(self, _hash):
         tree = self.git_object_parse(_hash)
         try:
-            tree = set(re.findall("(\d{5,6}) (.*?)\x00(.{20})", tree[2], re.M|re.S))
+            tree = set(re.findall(r'(\d{5,6}) (.*?)\x00(.{20})', tree[2], re.M | re.S))
         except TypeError:
             tree = set()
         tree_result = set()
@@ -114,7 +115,6 @@ class GitExtract(object):
             if file != data:
                 filename = '{}{}.{}'.format(_dir, _path, _hash[:6])
                 if not os.path.isfile(filename):
-                    # 这里的逻辑有待完善，虽然hash[:6]基本不会重复
                     save_file = True
         else:
             save_file = True
@@ -143,7 +143,6 @@ class GitExtract(object):
             commit = self.git_object_parse(_hash)
         else:
             commit = data
-        # 考虑到parent的hash可以利用于是修改为
         self.git_extract_by_hash(commit[2])
 
     def git_tag(self, _hash, data=''):
@@ -220,14 +219,13 @@ class GitExtract(object):
         if not packs:
             return
         _print('[*] Detect .git/objects/info/packs')
-        packs_hash = re.findall('P pack-([a-z0-9]{40}).pack', packs, re.S|re.M)
+        packs_hash = re.findall(r'P pack-([a-z0-9]{40}).pack', packs, re.S|re.M)
         pack_object_hash = set()
         for pack_hash in packs_hash:
             pack = GitPack(self.git_path, pack_hash)
             pack.pack_init()
             pack_object_hash.update(pack.objects.keys())
         self.git_parse_info_refs()
-        # 下面是应对未知情况，正常是hash都已经被解析
         unparse_hash = pack_object_hash - set(self.objects.keys())
         if unparse_hash:
             _print('[+] Parse Left Pack Object Hash')
@@ -261,6 +259,8 @@ class GitExtract(object):
             'refs/remotes/origin/HEAD',
             'ORIG_HEAD',
             'FETCH_HEAD',
+            'refs/wip/index/refs/heads/master', # PlaidCTF 2020 magit wip mode
+            'refs/wip/wtree/refs/heads/master',
         ]
         info_path = [
             'config',
