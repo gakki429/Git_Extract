@@ -23,7 +23,7 @@ class GitExtract(object):
             self.local = False
             _mkdir(self.git_path)
         else:
-            _print('Usage:\n\tpython {} http://example.com/.git/'.format((sys.argv[0])), 'red')
+            _print('Usage:\n\tpython {} http://example.com/.git/'.format((sys.argv[0])), 'red', False)
             sys.exit(0)
         self.objects = {}
         self.refs_hash = set()
@@ -43,14 +43,16 @@ class GitExtract(object):
           \\/                   \\/      \\/                  \\/     \\/      
                                                     Author: gakki429
         """
-        _print(Logo, 'green')
+        _print(Logo, 'green', logtime=False)
 
-    def download_file(self, path):
+    def download_file(self, path, big_file=False):
         if os.path.exists(path):
             return open(path, 'rb').read()
         if self.local:
             return
         url = self.git_host + path
+        if big_file:
+            _print('[*] Download {}'.format(path))
         try:
             resp = http_resp(url)
             if resp.getcode() == 200:
@@ -110,6 +112,7 @@ class GitExtract(object):
             data = self.git_object_parse(_hash)[2]
         except TypeError:
             return
+        _mkdir(filename)
         if os.path.isfile(filename):
             file = open(filename, 'rb').read()
             if file != data:
@@ -119,11 +122,13 @@ class GitExtract(object):
         else:
             save_file = True
         if save_file:
-            _print('[+] Save {}'.format(filename), 'green')
-            open(filename, 'wb').write(data)
+            try:
+                _print('[+] Save {}'.format(filename), 'green')
+                open(filename, 'wb').write(data)
+            except Exception:
+                pass
 
     def git_parse_tree(self, _hash, _dir='../'):
-        _mkdir(_dir)
         _print('[*] Parse Tree {} {}'.format(_dir, _hash[:6]))
         tree = self.git_ls_tree(_hash)
         for _type, _hash, _path in tree:
@@ -166,7 +171,7 @@ class GitExtract(object):
         for ref in refs:
             try:
                 ref_hash = self.download_file(ref).strip()
-                _print('[+] Extract Ref {} {}'.format(ref, ref_hash[:6]))
+                _print('[+] Extract Ref {} {}'.format(ref, ref_hash[:6]), 'green')
                 data = self.git_object_parse(ref_hash)
                 if data[0] == 'commit':
                     self.git_commit(ref_hash, data)
@@ -175,7 +180,7 @@ class GitExtract(object):
             except:
                 _print('[-] Except With Extract Ref {}'.format(ref), 'red')
 
-    def git_extract_by_hash(self, data):
+    def git_extract_by_hash(self, data, type_list=['commit', 'tree', 'tag', 'blob']):
         if not data:
             return
         data_hash = set(re.findall(r'[0-9a-z]{40}', data)) - set(self.objects.keys())
@@ -186,14 +191,15 @@ class GitExtract(object):
                 _type, _len, file = self.git_object_parse(_hash)
             except TypeError:
                 continue
-            if _type == 'commit':
-                self.git_commit(_hash)
-            elif _type == 'tree':
-                self.git_parse_tree(_hash)
-            elif _type == 'tag':
-                self.git_tag(_hash)
-            elif _type == 'blob':
-                self.git_save_blob('../', '{}_impossible_file.txt'.format(_hash[:6]), _hash)
+            if _type in type_list:
+                if _type == 'commit':
+                    self.git_commit(_hash)
+                elif _type == 'tree':
+                    self.git_parse_tree(_hash)
+                elif _type == 'tag':
+                    self.git_tag(_hash)
+                elif _type == 'blob':
+                    self.git_save_blob('../', '{}_impossible_file.txt'.format(_hash[:6]), _hash)
 
     def git_logs(self):
         logs = self.download_file('logs/HEAD')
@@ -223,13 +229,15 @@ class GitExtract(object):
         pack_object_hash = set()
         for pack_hash in packs_hash:
             pack = GitPack(self.git_path, pack_hash)
+            self.download_file(pack.idx_path)
+            self.download_file(pack.pack_path, big_file=True)
             pack.pack_init()
             pack_object_hash.update(pack.objects.keys())
         self.git_parse_info_refs()
         unparse_hash = pack_object_hash - set(self.objects.keys())
         if unparse_hash:
-            _print('[+] Parse Left Pack Object Hash')
-            self.git_extract_by_hash('\n'.join(unparse_hash))
+            _print('[+] Parse Left Pack Object Hash', 'green')
+            self.git_extract_by_hash('\n'.join(unparse_hash), ['commit', 'tag'])
 
     def git_stash(self):
         stash = self.download_file('refs/stash')
@@ -247,11 +255,12 @@ class GitExtract(object):
         for tree_hash in index.tree_objects.keys():
             if tree_hash not in self.objects.keys():
                 self.git_parse_tree(tree_hash)
-        left_file = set(index.blob_objects.keys()) - set(self.objects.keys())
-        for _hash in left_file:
-            file = index.blob_objects[_hash]
-            path = file['filename']
-            self.git_save_blob('../', path, _hash)
+        for _hash, file_list in index.blob_objects.items():
+            for file in file_list:
+                path = file['filename']
+                _print('[+] Index {}'.format(path[:50].ljust(50, ' ')), 'green', end='\r')
+                self.git_save_blob('../', path, _hash)
+        _print('', logtime=False)
 
     def git_other(self):
         hash_path = [
@@ -276,11 +285,11 @@ class GitExtract(object):
             self.download_file(path)
 
     def git_init(self):
+        self.git_parse_pack()
         self.git_head()
         self.git_logs()
         self.git_index_cache()
         self.git_stash()
-        self.git_parse_pack()
         self.git_other()
         _print('[*] Extract Done')
 

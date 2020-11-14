@@ -49,7 +49,10 @@ class GitIndex(object):
             filename = self.reads(name_len)
             fill_len = 8 - ((0x3e + name_len) % 8)
             fill = self.reads(fill_len)
-            self.blob_objects[_hash] = {'filename': filename, 'mode': mode, 'size': size}
+            if _hash in self.blob_objects:
+                self.blob_objects[_hash].append({'filename': filename, 'mode': mode, 'size': size})
+            else:
+                self.blob_objects[_hash] = [{'filename': filename, 'mode': mode, 'size': size}]
 
     def tree_parse(self):
         signature = self.reads(4)

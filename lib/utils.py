@@ -5,6 +5,7 @@ import os
 import ssl
 import struct
 import sys
+import time
 import urllib
 import urllib2
 
@@ -56,18 +57,24 @@ def win_set_color(color='cyan'):
     stdout_handle = windll.kernel32.GetStdHandle(-11)
     windll.kernel32.SetConsoleTextAttribute(stdout_handle, win_color[color]|default_bg)
 
-def _print(stdout, color='cyan'):
+def _print(stdout, color='cyan', logtime=True, end=''):
+    if logtime:
+        stdout = '[{}] {}'.format(time.strftime('%H:%M:%S', time.localtime()), stdout)
     if sys.platform.startswith('win'):
+        if not end:
+            end = '\r\n'
         win_set_color(color)
-        print '{}\r\n'.format(stdout),
+        print '{}{}'.format(stdout, end),
         win_set_color('default')
     else:
+        if not end:
+            end = '\n'
         unix_color = {
             'red': 31,
             'green': 32,
             'cyan': 36,
         }
-        print '\033[1;{}m{}\033[0m\n'.format(unix_color[color], stdout),
+        print '\033[1;{}m{}\033[0m{}'.format(unix_color[color], stdout, end),
 
 def _mkdir(path):
     path = os.path.dirname(path)

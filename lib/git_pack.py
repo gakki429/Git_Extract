@@ -5,6 +5,7 @@ import re
 import os
 import zlib
 import hashlib
+from lib.utils import _mkdir, _print
 
 class GitPack(object):
     """Git Parse Pack Format"""
@@ -20,21 +21,23 @@ class GitPack(object):
     def pack_header(self):
         pack = open(self.pack_path, 'rb').read()
         signature = pack[:4]
-        version_number = pack[4:8]
-        objects_number = pack[8:12]
-        self.objects_num = int(objects_number.encode('hex'), 16)
-        self.pack_data = pack
+        if signature == 'PACK':
+            version_number = pack[4:8]
+            objects_number = pack[8:12]
+            self.objects_num = int(objects_number.encode('hex'), 16)
+            self.pack_data = pack
 
     def idx_header(self):
         pack_idx = open(self.idx_path, 'rb').read()
         magic_number = pack_idx[:4]
-        version_number = pack_idx[4:8]
-        fan_out_table = pack_idx[8:8+1024]
-        pack_hash = pack_idx[-40:-20]
-        idx_hash = pack_idx[-20:]
-        # Todo: 区分版本（v1，v2），区分idx大小，大于 2g 的 offset 为 8bytes
-        idx_data = pack_idx[8+1024:-40]
-        self.parse_idx(idx_data)
+        if magic_number == '\xfftOc':
+            version_number = pack_idx[4:8]
+            fan_out_table = pack_idx[8:8+1024]
+            pack_hash = pack_idx[-40:-20]
+            idx_hash = pack_idx[-20:]
+            # Todo: 区分版本（v1，v2），区分idx大小，大于 2g 的 offset 为 8bytes
+            idx_data = pack_idx[8+1024:-40]
+            self.parse_idx(idx_data)
 
     def split_to_hex(self, length, data):
         data = re.findall(r'(.{{{}}})'.format(length), data, re.S|re.M)
@@ -101,11 +104,12 @@ class GitPack(object):
             except KeyError:
                 continue
             sha = hashlib.sha1(object_format).hexdigest()
-            path = 'objects/{}'.format(sha[:2])
-            if path and not os.path.exists(path):
-                os.makedirs(path)
+            path = 'objects/{}/{}'.format(sha[:2], sha[2:])
             zlib_object = zlib.compress(object_format)
-            open('{}/{}'.format(path, sha[2:]), 'wb').write(zlib_object)
+            _mkdir(path)
+            _print('[+] Pack {}'.format(path), 'green', end='\r')
+            open(path, 'wb').write(zlib_object)
+        _print('', logtime=False)
 
     def pack_init(self):
         self.pack_header()

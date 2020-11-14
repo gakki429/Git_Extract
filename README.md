@@ -65,6 +65,10 @@ $ python git_extract.py example/.git/ 一个本地的 .git 路径
     
     禁止跟随跳转，增加新恢复项 magit wip 模式
 
+- 2020-11-14：
+    
+    完善文件解析输出详情
+
 ### 待做
 
 - 解析其他版本的 git 文件格式，目前支持 version 2
